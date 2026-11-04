@@ -1,0 +1,14 @@
+# terraform/terraform.tfvars.example
+# Copia este archivo a terraform.tfvars y ajusta los valores.
+# NUNCA incluyas el token aquí. Usa TF_VAR_ocp_token como variable de entorno.
+
+ocp_host        = "https://api.itz-m23snt.infra01-lb.wdc04.techzone.ibm.com:6443"
+ocp_insecure    = true
+namespace       = "demo-bank"
+app_name        = "banco-demo"
+git_repo        = "https://github.com/jguevara-assist/bank-demo"
+git_ref         = "main"
+git_context_dir = "banco_demo"
+app_port        = 8000
+replicas        = 1
+route_host      = ""   # Dejar vacío para hostname automático de OpenShift

@@ -1,0 +1,98 @@
+[
+  {
+    "id": "DEMO-001",
+    "monthly_income": 4500000,
+    "monthly_obligations": 800000,
+    "history_months": 84,
+    "credit_utilization": 0.35,
+    "days_overdue": 0
+  },
+  {
+    "id": "DEMO-002",
+    "monthly_income": 2800000,
+    "monthly_obligations": 1400000,
+    "history_months": 36,
+    "credit_utilization": 0.72,
+    "days_overdue": 15
+  },
+  {
+    "id": "DEMO-003",
+    "monthly_income": 8200000,
+    "monthly_obligations": 1200000,
+    "history_months": 120,
+    "credit_utilization": 0.20,
+    "days_overdue": 0
+  },
+  {
+    "id": "DEMO-004",
+    "monthly_income": 3100000,
+    "monthly_obligations": 2500000,
+    "history_months": 12,
+    "credit_utilization": 0.90,
+    "days_overdue": 45
+  },
+  {
+    "id": "DEMO-005",
+    "monthly_income": 5600000,
+    "monthly_obligations": 900000,
+    "history_months": 60,
+    "credit_utilization": 0.40,
+    "days_overdue": 0
+  },
+  {
+    "id": "DEMO-006",
+    "monthly_income": 1900000,
+    "monthly_obligations": 600000,
+    "history_months": 24,
+    "credit_utilization": 0.55,
+    "days_overdue": 5
+  },
+  {
+    "id": "DEMO-007",
+    "monthly_income": 12000000,
+    "monthly_obligations": 1500000,
+    "history_months": 180,
+    "credit_utilization": 0.15,
+    "days_overdue": 0
+  },
+  {
+    "id": "DEMO-008",
+    "monthly_income": 3800000,
+    "monthly_obligations": 3200000,
+    "history_months": 48,
+    "credit_utilization": 0.80,
+    "days_overdue": 30
+  },
+  {
+    "id": "DEMO-009",
+    "monthly_income": 6500000,
+    "monthly_obligations": 1100000,
+    "history_months": 96,
+    "credit_utilization": 0.28,
+    "days_overdue": 0
+  },
+  {
+    "id": "DEMO-010",
+    "monthly_income": 2200000,
+    "monthly_obligations": 1900000,
+    "history_months": 6,
+    "credit_utilization": 0.95,
+    "days_overdue": 60
+  },
+  {
+    "id": "DEMO-011",
+    "monthly_income": 4100000,
+    "monthly_obligations": 700000,
+    "history_months": 72,
+    "credit_utilization": 0.30,
+    "days_overdue": 0
+  },
+  {
+    "id": "DEMO-012",
+    "monthly_income": 0,
+    "monthly_obligations": 0,
+    "history_months": 0,
+    "credit_utilization": 0.0,
+    "days_overdue": 0
+  }
+]

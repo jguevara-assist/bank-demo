@@ -1,0 +1,13 @@
+# Terraform — nunca commitear estado ni tfvars con secretos
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars
+terraform/tfplan
+terraform/*.tfstate
+terraform/*.tfstate.backup
+
+# Python
+__pycache__/
+*.pyc
+venv_local/
+.pytest_cache/
