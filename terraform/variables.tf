@@ -41,9 +41,9 @@ variable "git_ref" {
 }
 
 variable "git_context_dir" {
-  description = "Subdirectorio dentro del repo que contiene el Dockerfile (vacío = raíz)."
+  description = "Subdirectorio dentro del repo que contiene el Dockerfile (vacío = raíz del repo)."
   type        = string
-  default     = "banco_demo"
+  default     = ""
 }
 
 variable "app_port" {

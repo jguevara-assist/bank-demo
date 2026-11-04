@@ -6,6 +6,17 @@ Contiene:
   - Scoring de crédito determinista (v1.0)
   - Simulación de crédito (cuota fija)
   - Detección de señales de fraude
+
+Reloj utilizado para R1 (ventana de solicitudes):
+  La regla R1 compara timestamps del historial contra el timestamp de la
+  solicitud más reciente registrada en _REQUESTS (no contra datetime.now()).
+  Esto hace que el resultado sea determinista con los datos sintéticos y
+  permite pruebas reproducibles sin manipular el reloj del sistema.
+
+  Para pruebas que necesiten controlar la referencia temporal, pasa un
+  callable `now_fn: () -> datetime` a check_fraud_signals. Por defecto
+  se usa `_default_now`, que devuelve el máximo timestamp del historial
+  del cliente (comportamiento original).
 """
 
 from __future__ import annotations
@@ -14,7 +25,7 @@ import json
 import math
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Optional
 
 # ---------------------------------------------------------------------------
 # Carga de datos
@@ -186,6 +197,8 @@ def evaluate_loan(
 ) -> dict[str, Any]:
     score_result = calculate_credit_score(customer_id)
 
+    _LOAN_DISCLAIMER = "Evaluación exclusivamente demostrativa. No constituye oferta crediticia ni compromiso de desembolso."
+
     if score_result["status"] == "not_found":
         return {
             "customer_id": customer_id,
@@ -195,6 +208,7 @@ def evaluate_loan(
             "loan_simulation": None,
             "score_summary": score_result,
             "rules_version": LOAN_RULES_VERSION,
+            "disclaimer": _LOAN_DISCLAIMER,
         }
 
     if score_result["status"] == "insufficient_data":
@@ -206,6 +220,7 @@ def evaluate_loan(
             "loan_simulation": None,
             "score_summary": score_result,
             "rules_version": LOAN_RULES_VERSION,
+            "disclaimer": _LOAN_DISCLAIMER,
         }
 
     customer = _CUSTOMER_INDEX[customer_id]
@@ -290,12 +305,43 @@ _DEVICE_MULTI_CLIENT_MIN = 2
 _UNUSUAL_AMOUNT_FACTOR = 5
 
 
-def check_fraud_signals(customer_id: str, amount: float, device_id: str) -> dict[str, Any]:
+def _default_now(customer_times: list[datetime]) -> datetime:
+    """
+    Reloj por defecto para R1.
+
+    Devuelve el timestamp más reciente del historial del cliente, lo que hace
+    que la ventana de 60 minutos sea determinista con los datos sintéticos y
+    que las pruebas sean reproducibles sin depender de datetime.now().
+
+    Razonamiento: en producción real se usaría datetime.now(). En esta demo
+    se ancla al historial para garantizar que los casos de prueba no caduquen
+    con el paso del tiempo.
+    """
+    return max(customer_times)
+
+
+def check_fraud_signals(
+    customer_id: str,
+    amount: float,
+    device_id: str,
+    now_fn: Optional[Callable[[list[datetime]], datetime]] = None,
+) -> dict[str, Any]:
+    """
+    Evalúa señales de posible fraude sobre una solicitud entrante.
+
+    Parámetro `now_fn`:
+      Callable que recibe la lista de timestamps del historial del cliente y
+      devuelve el datetime de referencia para la ventana R1. Si es None, se
+      usa `_default_now` (máximo del historial). Para pruebas con reloj fijo,
+      pasa: `now_fn=lambda _: datetime(2026, 10, 1, 9, 20, 0)`.
+    """
+    if now_fn is None:
+        now_fn = _default_now
+
     customer = _CUSTOMER_INDEX.get(customer_id)
     signals: list[dict] = []
 
     # R1 — Solicitudes rápidas
-    cutoff = None
     customer_times: list[datetime] = []
     for req in _REQUESTS:
         if req["customer_id"] == customer_id:
@@ -303,8 +349,8 @@ def check_fraud_signals(customer_id: str, amount: float, device_id: str) -> dict
             customer_times.append(dt)
 
     if customer_times:
-        latest = max(customer_times)
-        window_start = latest - timedelta(minutes=_RAPID_REQUEST_WINDOW_MINUTES)
+        reference_time = now_fn(customer_times)
+        window_start = reference_time - timedelta(minutes=_RAPID_REQUEST_WINDOW_MINUTES)
         recent = [t for t in customer_times if t >= window_start]
         # +1 para incluir la solicitud actual
         if len(recent) + 1 >= _RAPID_REQUEST_MIN_COUNT:
