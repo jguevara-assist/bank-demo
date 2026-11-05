@@ -37,6 +37,8 @@ VARIABLES DE ENTORNO
   BANK_API_KEY       API key del backend (X-API-Key). Vacío = sin header.
   MCP_HOST           Host. Default: 0.0.0.0
   MCP_PORT           Puerto. Default: 8080
+  MCP_ALLOWED_HOSTS  Hosts admitidos por el transporte MCP, separados por comas.
+                     Default: localhost y DNS internos del Service en demo-bank.
   REQUEST_TIMEOUT    Timeout en segundos. Default: 15
 """
 
@@ -52,6 +54,7 @@ import httpx
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from mcp.server.mcpserver import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
 
 # ---------------------------------------------------------------------------
 # Configuración
@@ -70,6 +73,19 @@ MCP_BEARER_TOKEN: str | None = os.environ.get("MCP_BEARER_TOKEN") or None
 REQUEST_TIMEOUT: float = float(os.environ.get("REQUEST_TIMEOUT", "15"))
 MCP_HOST: str = os.environ.get("MCP_HOST", "0.0.0.0")
 MCP_PORT: int = int(os.environ.get("MCP_PORT", "8080"))
+MCP_ALLOWED_HOSTS: list[str] = [
+    host.strip()
+    for host in os.environ.get(
+        "MCP_ALLOWED_HOSTS",
+        "localhost,localhost:*,127.0.0.1,127.0.0.1:*,"
+        "banco-demo-mcp,banco-demo-mcp:*,"
+        "banco-demo-mcp.demo-bank,banco-demo-mcp.demo-bank:*,"
+        "banco-demo-mcp.demo-bank.svc,banco-demo-mcp.demo-bank.svc:*,"
+        "banco-demo-mcp.demo-bank.svc.cluster.local,"
+        "banco-demo-mcp.demo-bank.svc.cluster.local:*",
+    ).split(",")
+    if host.strip()
+]
 
 if MCP_BEARER_TOKEN:
     log.info("MCP_BEARER_TOKEN configurado — /mcp protegido.")
@@ -440,7 +456,13 @@ async def health() -> dict[str, str]:
 # Montar el transporte Streamable HTTP del servidor MCP en /mcp
 fastapi_app.mount(
     "/mcp",
-    app=mcp.streamable_http_app(streamable_http_path="/"),
+    app=mcp.streamable_http_app(
+        streamable_http_path="/",
+        transport_security=TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=MCP_ALLOWED_HOSTS,
+        ),
+    ),
 )
 
 
