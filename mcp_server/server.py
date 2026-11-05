@@ -382,7 +382,8 @@ async def lifespan(app: FastAPI):
         BANK_API_BASE_URL,
         "activo" if MCP_BEARER_TOKEN else "inactivo (dev)",
     )
-    yield
+    async with mcp.session_manager.run():
+        yield
     log.info("Banco Demo MCP apagado.")
 
 
@@ -437,7 +438,10 @@ async def health() -> dict[str, str]:
 
 
 # Montar el transporte Streamable HTTP del servidor MCP en /mcp
-fastapi_app.mount("/mcp", app=mcp.streamable_http_app())
+fastapi_app.mount(
+    "/mcp",
+    app=mcp.streamable_http_app(streamable_http_path="/"),
+)
 
 
 # ---------------------------------------------------------------------------
