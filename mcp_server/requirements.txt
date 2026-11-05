@@ -1,0 +1,10 @@
+# Servidor MCP — Banco Demo
+# Dependencias fijadas para reproducibilidad.
+# SDK versión verificada: mcp 2.3.0 (API v2: MCPServer)
+
+mcp[cli]==2.3.0
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+httpx==0.28.1
+starlette==0.41.3
+pywin32>=306; sys_platform == "win32"

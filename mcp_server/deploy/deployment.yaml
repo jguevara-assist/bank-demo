@@ -1,0 +1,89 @@
+---
+# deploy/deployment.yaml — Deployment del servidor MCP en OpenShift.
+#
+# Prerequisitos:
+#   1. El secreto banco-demo-mcp-secrets debe existir (ver secret.yaml).
+#   2. La imagen debe estar construida. Usa el BuildConfig o sustituye
+#      spec.template.spec.containers[0].image por la referencia de tu registro.
+#
+# Desplegar:
+#   oc apply -f deploy/deployment.yaml -n demo-bank
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banco-demo-mcp
+  namespace: demo-bank
+  labels:
+    app: banco-demo-mcp
+    component: mcp-server
+    version: "1.0.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: banco-demo-mcp
+  template:
+    metadata:
+      labels:
+        app: banco-demo-mcp
+        component: mcp-server
+    spec:
+      containers:
+        - name: banco-demo-mcp
+          # Sustituye por la imagen construida desde el BuildConfig o tu registro:
+          # image: image-registry.openshift-image-registry.svc:5000/demo-bank/banco-demo-mcp:latest
+          image: image-registry.openshift-image-registry.svc:5000/demo-bank/banco-demo-mcp:latest
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            - name: MCP_HOST
+              value: "0.0.0.0"
+            - name: MCP_PORT
+              value: "8080"
+            - name: REQUEST_TIMEOUT
+              value: "15"
+            - name: BANK_API_BASE_URL
+              value: "https://banco-demo-demo-bank.apps.itz-m23snt.infra01-lb.wdc04.techzone.ibm.com"
+            # Credenciales desde el secreto — nunca hardcodeadas
+            - name: MCP_BEARER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: banco-demo-mcp-secrets
+                  key: MCP_BEARER_TOKEN
+                  optional: false
+            - name: BANK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: banco-demo-mcp-secrets
+                  key: BANK_API_KEY
+                  optional: true
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+      # OpenShift asigna UID arbitrario — el Dockerfile lo gestiona
+      securityContext:
+        runAsNonRoot: true

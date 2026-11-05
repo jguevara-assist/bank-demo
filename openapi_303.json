@@ -1,0 +1,1059 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Banco Demo — Créditos y Fraude",
+    "description": "API de demostración con datos sintéticos para integración con IBM webMethods / MCP.\n\n**No utilizar para decisiones crediticias reales.**\n\n### Autenticación\nSin autenticación por defecto. Para activar API key mínima, define la variable de entorno `DEMO_API_KEY` y pasa el header `X-API-Key` en cada solicitud.\n\n### Servidor\nDefine `SERVER_URL` para incluir la URL base en el contrato OpenAPI exportado (ej. `https://banco-demo-demo-bank.apps.cluster.example.com`).",
+    "version": "1.1.0"
+  },
+  "paths": {
+    "/api/customers": {
+      "get": {
+        "tags": [
+          "Clientes"
+        ],
+        "summary": "Listar clientes de demostración",
+        "description": "Retorna la lista de los 12 clientes sintéticos con sus datos financieros.",
+        "operationId": "list_demo_customers",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/customers/{customer_id}/profile": {
+      "get": {
+        "tags": [
+          "Clientes"
+        ],
+        "summary": "Perfil crediticio del cliente",
+        "description": "Devuelve los datos financieros del cliente y el historial de solicitudes previas.",
+        "operationId": "get_customer_credit_profile",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "customer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Customer Id",
+              "example": "DEMO-001"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerProfileResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cliente no encontrado."
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/customers/{customer_id}/score": {
+      "get": {
+        "tags": [
+          "Score"
+        ],
+        "summary": "Calcular score de crédito simulado",
+        "description": "Calcula el score de crédito simulado para el cliente indicado.\n\nEl score va de 300 a 850 y es exclusivamente demostrativo.\nSi los datos son insuficientes (ingresos == 0), retorna `status=insufficient_data`.\nSi el cliente no existe, retorna `status=not_found`.",
+        "operationId": "calculate_demo_credit_score",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "customer_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Customer Id",
+              "example": "DEMO-001"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditScoreResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/fraud/check": {
+      "post": {
+        "tags": [
+          "Fraude"
+        ],
+        "summary": "Verificar señales de posible fraude",
+        "description": "Evalúa señales de alerta sobre una solicitud entrante.\n\nAplica tres reglas deterministas sobre el historial sintético:\n- **R1**: Múltiples solicitudes del mismo cliente en los últimos 60 minutos.\n  El tiempo de referencia es el timestamp más reciente en el historial del\n  cliente (determinista con datos sintéticos).\n- **R2**: El `device_id` proporcionado está asociado a múltiples clientes en\n  el historial. Usar el device_id real del dispositivo del solicitante.\n- **R3**: El monto supera 5× los ingresos mensuales del cliente.\n\nUna alerta **NO** constituye prueba de fraude.",
+        "operationId": "check_demo_fraud_signals",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FraudCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FraudSignalResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/loans/evaluate": {
+      "post": {
+        "tags": [
+          "Crédito"
+        ],
+        "summary": "Evaluar solicitud de crédito",
+        "description": "Evalúa una solicitud de crédito combinando scoring, simulación de cuota y señales de fraude.\n\n### Prioridad de decisión\n\n| Prioridad | Código          | Condición                                                   |\n|-----------|-----------------|-------------------------------------------------------------|\n| 1         | `NOT_FOUND`     | El customer_id no existe en los datos demo.                 |\n| 2         | `INSUF_DATA`    | Ingresos == 0; no se puede calcular score ni cuota.         |\n| 3         | `REJECTED`      | Score < 500 **o** carga > 60 %. **El rechazo crediticio tiene prioridad sobre cualquier alerta de fraude.** Si la solicitud es rechazada por criterios crediticios, la decisión es `rejected` aunque haya alerta HIGH. La alerta sigue visible en `fraud_check`. |\n| 4         | `REVIEW_FRAUD_ALERT` | Aprobada crediticiamente pero alerta HIGH de fraude.   |\n| 5         | `REVIEW`        | Score 500–649 o carga 40–60 %.                              |\n| 6         | `APPROVED`      | Score >= 650, carga <= 40 %, sin alerta HIGH.               |\n\n### device_id\n\nEste endpoint no recibe `device_id`. La verificación interna de fraude usa\n`\"WEB-PORTAL\"` como identificador genérico del canal web. Para evaluar fraude\ncon el device_id real del dispositivo del solicitante, llama primero a\n`POST /api/fraud/check` con el device_id correspondiente.\n\nNo ejecuta desembolsos.",
+        "operationId": "evaluate_demo_loan_application",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoanEvaluationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoanEvaluationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreditScoreResponse": {
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id",
+            "example": "DEMO-001"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_found"
+            ],
+            "title": "Status"
+          },
+          "score": {
+            "title": "Score",
+            "description": "Score simulado (300–850). Null cuando status != ok.",
+            "type": "integer",
+            "maximum": 850.0,
+            "minimum": 300.0,
+            "nullable": true,
+            "example": 736
+          },
+          "breakdown": {
+            "description": "Desglose de factores. Null cuando status != ok.",
+            "$ref": "#/components/schemas/ScoreBreakdown",
+            "nullable": true
+          },
+          "rules_version": {
+            "type": "string",
+            "title": "Rules Version",
+            "example": "v1.0"
+          },
+          "reason": {
+            "title": "Reason",
+            "description": "Motivo de datos insuficientes. Solo presente cuando status=insufficient_data.",
+            "type": "string",
+            "nullable": true,
+            "example": "Ingresos iguales a cero o no informados."
+          },
+          "disclaimer": {
+            "title": "Disclaimer",
+            "type": "string",
+            "nullable": true,
+            "example": "Score exclusivamente demostrativo. No representa buró de crédito ni modelo validado."
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id",
+          "status",
+          "rules_version"
+        ],
+        "title": "CreditScoreResponse",
+        "description": "Respuesta de GET /api/customers/{customer_id}/score.\n\n`status` posibles:\n- `ok`                : score calculado correctamente.\n- `insufficient_data` : ingresos == 0; score no disponible.\n- `not_found`         : cliente no existe en los datos demo.",
+        "example": {
+          "breakdown": {
+            "composite": 0.893,
+            "dti_ratio": 0.1463,
+            "partial_dti": 0.8537,
+            "partial_history": 1.0,
+            "partial_overdue": 1.0,
+            "partial_utilization": 0.8,
+            "weights": {
+              "dti": 0.35,
+              "history": 0.1,
+              "overdue": 0.25,
+              "utilization": 0.3
+            }
+          },
+          "customer_id": "DEMO-003",
+          "disclaimer": "Score exclusivamente demostrativo. No representa buró de crédito ni modelo validado.",
+          "rules_version": "v1.0",
+          "score": 791,
+          "status": "ok"
+        }
+      },
+      "CustomerData": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Identificador único del cliente demo.",
+            "example": "DEMO-001"
+          },
+          "monthly_income": {
+            "type": "number",
+            "title": "Monthly Income",
+            "description": "Ingresos mensuales en COP.",
+            "example": 4500000
+          },
+          "monthly_obligations": {
+            "type": "number",
+            "title": "Monthly Obligations",
+            "description": "Obligaciones mensuales vigentes en COP.",
+            "example": 800000
+          },
+          "history_months": {
+            "type": "integer",
+            "title": "History Months",
+            "description": "Antigüedad del historial crediticio en meses.",
+            "example": 84
+          },
+          "credit_utilization": {
+            "type": "number",
+            "title": "Credit Utilization",
+            "description": "Proporción de crédito utilizado (0–1).",
+            "example": 0.35
+          },
+          "days_overdue": {
+            "type": "integer",
+            "title": "Days Overdue",
+            "description": "Días de mora actuales.",
+            "example": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "monthly_income",
+          "monthly_obligations",
+          "history_months",
+          "credit_utilization",
+          "days_overdue"
+        ],
+        "title": "CustomerData",
+        "description": "Datos financieros de un cliente sintético."
+      },
+      "CustomerListResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "example": 12
+          },
+          "customers": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerData"
+            },
+            "type": "array",
+            "title": "Customers"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer",
+            "example": "Datos sintéticos. No representan personas reales."
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "customers",
+          "disclaimer"
+        ],
+        "title": "CustomerListResponse",
+        "description": "Respuesta de GET /api/customers.",
+        "example": {
+          "customers": [
+            {
+              "credit_utilization": 0.35,
+              "days_overdue": 0,
+              "history_months": 84,
+              "id": "DEMO-001",
+              "monthly_income": 4500000,
+              "monthly_obligations": 800000
+            }
+          ],
+          "disclaimer": "Datos sintéticos. No representan personas reales.",
+          "total": 12
+        }
+      },
+      "CustomerProfileResponse": {
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/CustomerData"
+          },
+          "request_history": {
+            "items": {
+              "$ref": "#/components/schemas/RequestHistoryItem"
+            },
+            "type": "array",
+            "title": "Request History"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer",
+            "example": "Datos sintéticos. No representan personas reales."
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer",
+          "request_history",
+          "disclaimer"
+        ],
+        "title": "CustomerProfileResponse",
+        "description": "Respuesta de GET /api/customers/{customer_id}/profile.",
+        "example": {
+          "customer": {
+            "credit_utilization": 0.35,
+            "days_overdue": 0,
+            "history_months": 84,
+            "id": "DEMO-001",
+            "monthly_income": 4500000,
+            "monthly_obligations": 800000
+          },
+          "disclaimer": "Datos sintéticos. No representan personas reales.",
+          "request_history": [
+            {
+              "amount": 15000000,
+              "customer_id": "DEMO-001",
+              "device_id": "DEV-AAA",
+              "request_id": "REQ-001",
+              "result": "approved",
+              "timestamp": "2026-10-01T09:10:00"
+            }
+          ]
+        }
+      },
+      "FraudCheckRequest": {
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id",
+            "description": "Identificador del cliente demo.",
+            "example": "DEMO-001"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount",
+            "description": "Monto de la solicitud en COP.",
+            "minimum": 0.0,
+            "exclusiveMinimum": true,
+            "example": 15000000
+          },
+          "device_id": {
+            "type": "string",
+            "title": "Device Id",
+            "description": "Identificador del dispositivo desde el que se realiza la solicitud. Se usa para la regla R2 (dispositivo asociado a múltiples clientes). Debe ser el identificador real del dispositivo del solicitante.",
+            "example": "DEV-AAA"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id",
+          "amount",
+          "device_id"
+        ],
+        "title": "FraudCheckRequest",
+        "description": "Cuerpo de POST /api/fraud/check.",
+        "example": {
+          "amount": 15000000,
+          "customer_id": "DEMO-001",
+          "device_id": "DEV-AAA"
+        }
+      },
+      "FraudSignal": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id",
+            "example": "R1"
+          },
+          "rule_name": {
+            "type": "string",
+            "title": "Rule Name",
+            "example": "MULTIPLE_REQUESTS"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "example": "Se detectaron 2 solicitudes previas del cliente en los últimos 60 minutos."
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "rule_name",
+          "detail"
+        ],
+        "title": "FraudSignal"
+      },
+      "FraudSignalResponse": {
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id",
+            "example": "DEMO-001"
+          },
+          "device_id": {
+            "type": "string",
+            "title": "Device Id",
+            "example": "DEV-AAA"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount",
+            "example": 15000000
+          },
+          "alert_level": {
+            "type": "string",
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ],
+            "title": "Alert Level"
+          },
+          "signals_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Signals Count",
+            "example": 2
+          },
+          "signals": {
+            "items": {
+              "$ref": "#/components/schemas/FraudSignal"
+            },
+            "type": "array",
+            "title": "Signals"
+          },
+          "recommendation": {
+            "type": "string",
+            "title": "Recommendation",
+            "example": "Solicitud enviada a revisión automática por múltiples señales. No implica culpabilidad del cliente."
+          },
+          "rules_version": {
+            "type": "string",
+            "title": "Rules Version",
+            "example": "v1.0"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer",
+            "example": "Las alertas son indicativas. No constituyen evidencia de fraude ni implican culpabilidad."
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id",
+          "device_id",
+          "amount",
+          "alert_level",
+          "signals_count",
+          "signals",
+          "recommendation",
+          "rules_version",
+          "disclaimer"
+        ],
+        "title": "FraudSignalResponse",
+        "description": "Respuesta de POST /api/fraud/check.\n\n`alert_level`:\n- `HIGH`   : ≥2 reglas activas → revisión automática.\n- `MEDIUM` : 1 regla activa.\n- `LOW`    : ninguna regla activa.\n\nUna alerta NO constituye prueba de fraude ni implica culpabilidad del cliente.",
+        "example": {
+          "alert_level": "HIGH",
+          "amount": 25000000,
+          "customer_id": "DEMO-001",
+          "device_id": "DEV-AAA",
+          "disclaimer": "Las alertas son indicativas. No constituyen evidencia de fraude ni implican culpabilidad.",
+          "recommendation": "Solicitud enviada a revisión automática por múltiples señales. No implica culpabilidad del cliente.",
+          "rules_version": "v1.0",
+          "signals": [
+            {
+              "detail": "Se detectaron 3 solicitudes previas en los últimos 60 minutos.",
+              "rule_id": "R1",
+              "rule_name": "MULTIPLE_REQUESTS"
+            },
+            {
+              "detail": "El monto solicitado (25,000,000 COP) supera 5× los ingresos mensuales.",
+              "rule_id": "R3",
+              "rule_name": "UNUSUAL_AMOUNT"
+            }
+          ],
+          "signals_count": 2
+        }
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LoanEvaluationRequest": {
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id",
+            "example": "DEMO-003"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount",
+            "description": "Monto en COP.",
+            "minimum": 0.0,
+            "exclusiveMinimum": true,
+            "example": 20000000
+          },
+          "term_months": {
+            "type": "integer",
+            "maximum": 360.0,
+            "minimum": 1.0,
+            "title": "Term Months",
+            "description": "Plazo en meses (1–360).",
+            "example": 36
+          },
+          "annual_effective_rate": {
+            "type": "number",
+            "title": "Annual Effective Rate",
+            "description": "Tasa efectiva anual en formato decimal (ej. 0.18 = 18 %).",
+            "minimum": 0.0,
+            "exclusiveMinimum": true,
+            "maximum": 2.0,
+            "exclusiveMaximum": true,
+            "example": 0.18
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id",
+          "amount",
+          "term_months",
+          "annual_effective_rate"
+        ],
+        "title": "LoanEvaluationRequest",
+        "description": "Cuerpo de POST /api/loans/evaluate.\n\nNota sobre device_id: este endpoint no recibe device_id. La verificación\nde fraude interna utiliza `\"WEB-PORTAL\"` como identificador genérico del\ncanal web, lo que significa que la regla R2 (dispositivo multicliente) solo\nse activará si el historial contiene solicitudes previas desde \"WEB-PORTAL\".\nPara una verificación de fraude con device_id real, usa POST /api/fraud/check.",
+        "example": {
+          "amount": 20000000,
+          "annual_effective_rate": 0.18,
+          "customer_id": "DEMO-003",
+          "term_months": 36
+        }
+      },
+      "LoanEvaluationResponse": {
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id",
+            "example": "DEMO-003"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected",
+              "review",
+              "review_fraud_alert",
+              "insufficient_data",
+              "not_found"
+            ],
+            "title": "Decision"
+          },
+          "decision_code": {
+            "type": "string",
+            "enum": [
+              "APPROVED",
+              "REJECTED",
+              "REVIEW",
+              "REVIEW_FRAUD_ALERT",
+              "INSUF_DATA",
+              "NOT_FOUND"
+            ],
+            "title": "Decision Code"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons",
+            "description": "Lista de motivos que explican la decisión.",
+            "example": [
+              "Score 791 >= 650 y carga financiera 33.86% <= 40%."
+            ]
+          },
+          "loan_simulation": {
+            "description": "Simulación financiera. Null cuando status es not_found o insufficient_data.",
+            "$ref": "#/components/schemas/LoanSimulation",
+            "nullable": true
+          },
+          "score_summary": {
+            "$ref": "#/components/schemas/ScoreSummary"
+          },
+          "fraud_check": {
+            "description": "Resultado de la verificación de señales de fraude. device_id='WEB-PORTAL' cuando el solicitante no proveyó identificador de dispositivo. Null cuando status es not_found o insufficient_data.",
+            "$ref": "#/components/schemas/FraudSignalResponse",
+            "nullable": true
+          },
+          "rules_version": {
+            "type": "string",
+            "title": "Rules Version",
+            "example": "v1.0"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer",
+            "example": "Evaluación exclusivamente demostrativa. No constituye oferta crediticia ni compromiso de desembolso."
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_id",
+          "decision",
+          "decision_code",
+          "reasons",
+          "score_summary",
+          "rules_version",
+          "disclaimer"
+        ],
+        "title": "LoanEvaluationResponse",
+        "description": "Respuesta de POST /api/loans/evaluate.\n\nPrioridad de decisión (aplicada en este orden):\n1. `not_found`         — el customer_id no existe.\n2. `insufficient_data` — ingresos == 0; no se puede calcular score ni cuota.\n3. `rejected`          — score < 500 O carga financiera > 60%. El rechazo\n                         crediticio tiene prioridad sobre cualquier alerta de fraude:\n                         si la solicitud es rechazada por criterios crediticios,\n                         la decisión final es `rejected` aunque haya alerta HIGH.\n4. `review_fraud_alert`— aprobada crediticiamente (score≥650, carga≤40%) pero\n                         alerta de fraude HIGH. La decisión se eleva a revisión.\n5. `review`            — rango intermedio (score 500–649 o carga 40–60%).\n6. `approved`          — score ≥ 650 y carga ≤ 40% y sin alerta HIGH de fraude.\n\nEl campo `fraud_check.device_id` muestra el dispositivo usado en la evaluación.\nCuando se llama a este endpoint sin proveer device_id, se utiliza `\"WEB-PORTAL\"`\ncomo identificador genérico. Para una evaluación de fraude precisa, usa\nPOST /api/fraud/check con el device_id real del dispositivo del solicitante.",
+        "example": {
+          "summary": "Caso aprobado — DEMO-003",
+          "value": {
+            "customer_id": "DEMO-003",
+            "decision": "approved",
+            "decision_code": "APPROVED",
+            "disclaimer": "Evaluación exclusivamente demostrativa. No constituye oferta crediticia ni compromiso de desembolso.",
+            "fraud_check": {
+              "alert_level": "LOW",
+              "amount": 20000000,
+              "customer_id": "DEMO-003",
+              "device_id": "WEB-PORTAL",
+              "disclaimer": "Las alertas son indicativas. No constituyen evidencia de fraude ni implican culpabilidad.",
+              "recommendation": "Sin señales de alerta detectadas.",
+              "rules_version": "v1.0",
+              "signals": [],
+              "signals_count": 0
+            },
+            "loan_simulation": {
+              "amount_cop": 20000000,
+              "annual_effective_rate": 0.18,
+              "fixed_payment_cop": 723680.0,
+              "monthly_rate": 0.01388,
+              "new_debt_to_income": 0.2099,
+              "term_months": 36,
+              "total_payment_cop": 26052480.0
+            },
+            "reasons": [
+              "Score 791 >= 650 y carga financiera 18.83% <= 40%."
+            ],
+            "rules_version": "v1.0",
+            "score_summary": {
+              "rules_version": "v1.0",
+              "score": 791,
+              "status": "ok"
+            }
+          }
+        }
+      },
+      "LoanSimulation": {
+        "properties": {
+          "amount_cop": {
+            "type": "number",
+            "title": "Amount Cop",
+            "description": "Monto solicitado en COP.",
+            "example": 20000000
+          },
+          "term_months": {
+            "type": "integer",
+            "title": "Term Months",
+            "description": "Plazo en meses.",
+            "example": 36
+          },
+          "annual_effective_rate": {
+            "type": "number",
+            "title": "Annual Effective Rate",
+            "description": "Tasa efectiva anual (decimal).",
+            "example": 0.18
+          },
+          "monthly_rate": {
+            "type": "number",
+            "title": "Monthly Rate",
+            "description": "Tasa mensual calculada (decimal).",
+            "example": 0.01388
+          },
+          "fixed_payment_cop": {
+            "type": "number",
+            "title": "Fixed Payment Cop",
+            "description": "Cuota fija mensual estimada en COP.",
+            "example": 723680.0
+          },
+          "total_payment_cop": {
+            "type": "number",
+            "title": "Total Payment Cop",
+            "description": "Total a pagar al final del plazo en COP.",
+            "example": 26052480.0
+          },
+          "new_debt_to_income": {
+            "type": "number",
+            "title": "New Debt To Income",
+            "description": "Carga financiera resultante: (obligaciones actuales + nueva cuota) / ingresos.",
+            "example": 0.3386
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount_cop",
+          "term_months",
+          "annual_effective_rate",
+          "monthly_rate",
+          "fixed_payment_cop",
+          "total_payment_cop",
+          "new_debt_to_income"
+        ],
+        "title": "LoanSimulation",
+        "description": "Resultado de la simulación financiera."
+      },
+      "RequestHistoryItem": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id",
+            "example": "REQ-001"
+          },
+          "customer_id": {
+            "type": "string",
+            "title": "Customer Id",
+            "example": "DEMO-001"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount",
+            "example": 15000000
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp",
+            "example": "2026-10-01T09:10:00"
+          },
+          "device_id": {
+            "type": "string",
+            "title": "Device Id",
+            "example": "DEV-AAA"
+          },
+          "result": {
+            "type": "string",
+            "title": "Result",
+            "example": "approved"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "customer_id",
+          "amount",
+          "timestamp",
+          "device_id",
+          "result"
+        ],
+        "title": "RequestHistoryItem",
+        "description": "Entrada del historial de solicitudes sintéticas."
+      },
+      "ScoreBreakdown": {
+        "properties": {
+          "dti_ratio": {
+            "type": "number",
+            "title": "Dti Ratio",
+            "description": "Relación obligaciones / ingresos.",
+            "example": 0.1778
+          },
+          "partial_dti": {
+            "type": "number",
+            "title": "Partial Dti",
+            "description": "Puntuación parcial DTI (0–1, 1=mejor).",
+            "example": 0.8222
+          },
+          "partial_utilization": {
+            "type": "number",
+            "title": "Partial Utilization",
+            "description": "Puntuación parcial utilización (0–1).",
+            "example": 0.65
+          },
+          "partial_overdue": {
+            "type": "number",
+            "title": "Partial Overdue",
+            "description": "Puntuación parcial mora (1.0 / 0.5 / 0.25 / 0.0).",
+            "example": 1.0
+          },
+          "partial_history": {
+            "type": "number",
+            "title": "Partial History",
+            "description": "Puntuación parcial antigüedad (0–1).",
+            "example": 0.7
+          },
+          "composite": {
+            "type": "number",
+            "title": "Composite",
+            "description": "Puntuación compuesta ponderada (0–1).",
+            "example": 0.7928
+          },
+          "weights": {
+            "$ref": "#/components/schemas/ScoreWeights"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dti_ratio",
+          "partial_dti",
+          "partial_utilization",
+          "partial_overdue",
+          "partial_history",
+          "composite",
+          "weights"
+        ],
+        "title": "ScoreBreakdown",
+        "description": "Desglose de factores del score de crédito."
+      },
+      "ScoreSummary": {
+        "properties": {
+          "score": {
+            "title": "Score",
+            "type": "integer",
+            "nullable": true,
+            "example": 736
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "not_found"
+            ],
+            "title": "Status"
+          },
+          "rules_version": {
+            "type": "string",
+            "title": "Rules Version",
+            "example": "v1.0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "rules_version"
+        ],
+        "title": "ScoreSummary"
+      },
+      "ScoreWeights": {
+        "properties": {
+          "dti": {
+            "type": "number",
+            "title": "Dti",
+            "example": 0.35
+          },
+          "utilization": {
+            "type": "number",
+            "title": "Utilization",
+            "example": 0.3
+          },
+          "overdue": {
+            "type": "number",
+            "title": "Overdue",
+            "example": 0.25
+          },
+          "history": {
+            "type": "number",
+            "title": "History",
+            "example": 0.1
+          }
+        },
+        "type": "object",
+        "required": [
+          "dti",
+          "utilization",
+          "overdue",
+          "history"
+        ],
+        "title": "ScoreWeights"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  }
+}

@@ -1,0 +1,81 @@
+---
+# deploy/service.yaml — Service interno para el servidor MCP.
+apiVersion: v1
+kind: Service
+metadata:
+  name: banco-demo-mcp
+  namespace: demo-bank
+  labels:
+    app: banco-demo-mcp
+spec:
+  selector:
+    app: banco-demo-mcp
+  ports:
+    - name: mcp-http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP
+---
+# deploy/route.yaml — Route TLS edge para el servidor MCP.
+# El endpoint /mcp queda expuesto con HTTPS.
+# IBM API Connect apuntará a esta URL como backend del API.
+#
+# URL resultante (hostname generado automáticamente por OpenShift):
+#   https://banco-demo-mcp-demo-bank.apps.itz-m23snt.infra01-lb.wdc04.techzone.ibm.com
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: banco-demo-mcp
+  namespace: demo-bank
+  labels:
+    app: banco-demo-mcp
+spec:
+  to:
+    kind: Service
+    name: banco-demo-mcp
+    weight: 100
+  port:
+    targetPort: mcp-http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+---
+# deploy/buildconfig.yaml — BuildConfig para construir la imagen del servidor MCP.
+# Ejecuta: oc start-build banco-demo-mcp -n demo-bank --follow
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: banco-demo-mcp
+  namespace: demo-bank
+  labels:
+    app: banco-demo-mcp
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/jguevara-assist/bank-demo
+      ref: main
+    contextDir: banco_demo/mcp_server
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: banco-demo-mcp:latest
+  runPolicy: Serial
+---
+# deploy/imagestream.yaml
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: banco-demo-mcp
+  namespace: demo-bank
+  labels:
+    app: banco-demo-mcp
+spec:
+  lookupPolicy:
+    local: true
